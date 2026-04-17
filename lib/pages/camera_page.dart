@@ -195,10 +195,24 @@ class _CameraPageState extends State<CameraPage> {
                       onPressed: imageBytes == null
                           ? null
                           : () async {
-                              await ImageGallerySaver.saveImage(imageBytes);
+                              final result = await ImageGallerySaver.saveImage(imageBytes);
                               if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('保存しました')),
+                                final success = result['isSuccess'] == true;
+                                showDialog(
+                                  context: context,
+                                  builder: (ctx) => AlertDialog(
+                                    content: Text(
+                                      success ? '保存しました' : '保存に失敗しました',
+                                      textAlign: TextAlign.center,
+                                    ),
+                                    actionsAlignment: MainAxisAlignment.center,
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(ctx),
+                                        child: const Text('OK'),
+                                      ),
+                                    ],
+                                  ),
                                 );
                               }
                             },
