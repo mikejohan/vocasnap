@@ -91,20 +91,8 @@ class _CameraPageState extends State<CameraPage> {
                 },
                 {
                   'type': 'text',
-                  //デフォルト
-                  'text': 'この画像に写っているものを見て、簡潔に日本語で面白いコメントしてください。30文字以内で。',
-                  //案A-1：毒舌ツッコミ型
-                  // 'text':
-                  //     'あなたはお笑い芸人です。この画像に対して、毒舌だけど愛のあるツッコミを一言だけしてください。説明は不要。ツッコミだけ。30文字以内。',
-                  //案A-2：毒舌ボケ型
-                  // 'text':
-                  //     'あなたはお笑い芸人です。この画像に対して、毒舌だけど愛のあるボケを一言だけしてください。説明は不要。ボケだけ。30文字以内。',
-                  //案B：大喜利型
-                  // 'text':
-                  //     'この画像を大喜利のお題として「写真で一言」を答えてください。説明や前置きは一切不要。回答だけを30文字以内で。',
-                  //案C：陽キャ応援型
-                  // 'text':
-                  //     'あなたは何を見てもポジティブに解釈する陽キャです。この画像を見て、明るく一言コメントしてください。説明不要。30文字以内。',
+                  'text':
+                      'この画像に写っているものを日本語と英語で説明してください。以下のJSON形式のみで返してください。説明文は各言語で2〜3文程度。各文は改行(\\n)で区切ってください。\n{"japanese": "日本語の文1。\\n日本語の文2。", "english": "English sentence 1.\\nEnglish sentence 2."}',
                 },
               ],
             },
@@ -112,27 +100,33 @@ class _CameraPageState extends State<CameraPage> {
         }),
       );
 
-      String comment;
+      String japanese;
+      String english;
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        comment = data['content'][0]['text'] as String;
+        final raw = data['content'][0]['text'] as String;
+        final text = raw.replaceAll(RegExp(r'```json|```'), '').trim();
+        final parsed = jsonDecode(text);
+        japanese = parsed['japanese'] as String;
+        english = parsed['english'] as String;
       } else {
-        comment = 'エラー: ${response.statusCode}';
+        japanese = 'エラー: ${response.statusCode}';
+        english = '';
       }
 
       if (mounted) {
-        _showResultSheet(imageBytes, comment);
+        _showResultSheet(imageBytes, japanese, english);
       }
     } catch (e) {
       if (mounted) {
-        _showResultSheet(null, '通信エラー: $e');
+        _showResultSheet(null, '通信エラー: $e', '');
       }
     } finally {
       if (mounted) setState(() => _isAnalyzing = false);
     }
   }
 
-  void _showResultSheet(Uint8List? imageBytes, String comment) {
+  void _showResultSheet(Uint8List? imageBytes, String japanese, String english) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -147,8 +141,9 @@ class _CameraPageState extends State<CameraPage> {
             ),
             padding: const EdgeInsets.all(16),
             child: SafeArea(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
                 children: [
                   // ドラッグハンドル
                   Container(
@@ -172,12 +167,27 @@ class _CameraPageState extends State<CameraPage> {
                       ),
                     ),
                   const SizedBox(height: 12),
-                  // AIコメント
-                  Text(
-                    comment,
-                    style: const TextStyle(fontSize: 16),
-                    textAlign: TextAlign.center,
+                  // 日本語
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text('🇯🇵 日本語',
+                        style: TextStyle(fontSize: 12, color: Colors.grey)),
                   ),
+                  const SizedBox(height: 4),
+                  Text(japanese,
+                      style: const TextStyle(fontSize: 15, color: Colors.black87)),
+                  const SizedBox(height: 12),
+                  const Icon(Icons.swap_horiz, color: Colors.grey),
+                  const SizedBox(height: 12),
+                  // 英語
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text('🇺🇸 English',
+                        style: TextStyle(fontSize: 12, color: Colors.grey)),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(english,
+                      style: const TextStyle(fontSize: 15, color: Colors.black87)),
                   const SizedBox(height: 20),
                   // ボタン行
                   Row(
@@ -239,7 +249,7 @@ class _CameraPageState extends State<CameraPage> {
                                 await file.writeAsBytes(imageBytes);
                                 await SharePlus.instance.share(
                                   ShareParams(
-                                    text: comment,
+                                    text: '$japanese\n\n$english',
                                     files: [XFile(file.path)],
                                   ),
                                 );
@@ -250,6 +260,7 @@ class _CameraPageState extends State<CameraPage> {
                 ],
               ),
             ),
+          ),
           ),
         );
       },
