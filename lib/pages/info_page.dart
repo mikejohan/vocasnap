@@ -13,7 +13,7 @@ class _InfoPageState extends State<InfoPage> {
     return Scaffold(
       appBar: AppBar(backgroundColor: Colors.white),
       body: Center(child: Text("アプリの説明")),
-      // backgroundColor: Colors.white,
+      backgroundColor: Colors.white,
     );
   }
 }

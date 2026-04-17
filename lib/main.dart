@@ -2,7 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
-import 'package:cac/pages/camera_page.dart';
+import 'package:cac/pages/landing_page.dart';
 
 List<CameraDescription> cameras = [];
 
@@ -20,7 +20,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Camera AI',
       theme: ThemeData.dark(),
-      home: const CameraPage(),
+      home: const LandingPage(),
     );
   }
 }
