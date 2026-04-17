@@ -20,22 +20,14 @@ class _CameraPageState extends State<CameraPage> {
   CameraController? _controller;
   bool _isInitialized = false;
   String? _errorMessage;
-  String _aiComment = '';
   bool _isAnalyzing = false;
 
   @override
   void initState() {
     super.initState();
     _initCamera();
-    // カメラ初期化後に5秒ごとに自動解析
-    //やはり「ボタン押下→API呼び出し」とするのでとりあえずコメントアウト
-    //最終的に、「最初のみ3秒経過後に呼び出し、その後はボタン押下毎に呼び出し、
-    // ブラウザリロードで3秒経過後に呼び出し」とした。
     Future.delayed(const Duration(seconds: 3), () {
       _analyzeImage();
-      // _timer = Timer.periodic(const Duration(seconds: 10), (timer) {
-      //   _analyzeImage();
-      // });
     });
   }
 
@@ -52,7 +44,7 @@ class _CameraPageState extends State<CameraPage> {
 
     _controller = CameraController(
       camera,
-      ResolutionPreset.medium, // 画像サイズ抑えてコスト節約
+      ResolutionPreset.medium,
       enableAudio: false,
     );
 
@@ -66,23 +58,16 @@ class _CameraPageState extends State<CameraPage> {
 
   Future<void> _analyzeImage() async {
     if (_isAnalyzing || _controller == null) return;
-    // これを追加
     if (!_controller!.value.isInitialized) return;
 
-    setState(() {
-      _isAnalyzing = true;
-      _aiComment = '解析中...';
-    });
+    setState(() => _isAnalyzing = true);
 
     try {
-      // 画像キャプチャ
       final XFile imageFile = await _controller!.takePicture();
       final Uint8List imageBytes = await imageFile.readAsBytes();
       final String base64Image = base64Encode(imageBytes);
 
-      // Claude Haiku 4.5 API呼び出し
       final response = await http.post(
-        // Uri.parse('https://api.anthropic.com/v1/messages'),
         Uri.parse('https://rapid-band-c3f6.johanmike549.workers.dev'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
@@ -102,19 +87,18 @@ class _CameraPageState extends State<CameraPage> {
                 },
                 {
                   'type': 'text',
-
                   //デフォルト
                   'text': 'この画像に写っているものを見て、簡潔に日本語で面白いコメントしてください。30文字以内で。',
                   //案A-1：毒舌ツッコミ型
                   // 'text':
                   //     'あなたはお笑い芸人です。この画像に対して、毒舌だけど愛のあるツッコミを一言だけしてください。説明は不要。ツッコミだけ。30文字以内。',
-                  //案A-2：毒舌ボケ型(ボケでもツッコミでも変わらない。)
+                  //案A-2：毒舌ボケ型
                   // 'text':
                   //     'あなたはお笑い芸人です。この画像に対して、毒舌だけど愛のあるボケを一言だけしてください。説明は不要。ボケだけ。30文字以内。',
-                  //案B：大喜利型（写真で一言）
+                  //案B：大喜利型
                   // 'text':
                   //     'この画像を大喜利のお題として「写真で一言」を答えてください。説明や前置きは一切不要。回答だけを30文字以内で。',
-                  //案C：陽キャ応援型(明るいコメントが出るが、面白いかは別、別に面白くはない。)
+                  //案C：陽キャ応援型
                   // 'text':
                   //     'あなたは何を見てもポジティブに解釈する陽キャです。この画像を見て、明るく一言コメントしてください。説明不要。30文字以内。',
                 },
@@ -124,23 +108,105 @@ class _CameraPageState extends State<CameraPage> {
         }),
       );
 
+      String comment;
       if (response.statusCode == 200) {
-        print("🐈${response.statusCode}");
         final data = jsonDecode(response.body);
-        print("🐈${data}");
-        final comment = data['content'][0]['text'] as String;
-        print("🐈${data}");
-        setState(() => _aiComment = comment);
+        comment = data['content'][0]['text'] as String;
       } else {
-        setState(() => _aiComment = 'エラー: ${response.statusCode}');
-        print('エラー: ${response.statusCode}');
+        comment = 'エラー: ${response.statusCode}';
+      }
+
+      if (mounted) {
+        _showResultSheet(imageBytes, comment);
       }
     } catch (e) {
-      setState(() => _aiComment = '通信エラー: $e');
-      print('通信エラー: $e');
+      if (mounted) {
+        _showResultSheet(null, '通信エラー: $e');
+      }
     } finally {
-      setState(() => _isAnalyzing = false);
+      if (mounted) setState(() => _isAnalyzing = false);
     }
+  }
+
+  void _showResultSheet(Uint8List? imageBytes, String comment) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          padding: const EdgeInsets.all(16),
+          child: SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // ドラッグハンドル
+                Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                // 撮影画像
+                if (imageBytes != null)
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.memory(
+                      imageBytes,
+                      height: 260,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                const SizedBox(height: 12),
+                // AIコメント
+                Text(
+                  comment,
+                  style: const TextStyle(fontSize: 16),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 20),
+                // ボタン行
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    TextButton.icon(
+                      icon: const Icon(Icons.delete_outline, color: Colors.red),
+                      label: const Text(
+                        '破棄',
+                        style: TextStyle(color: Colors.red),
+                      ),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                    TextButton.icon(
+                      icon: const Icon(Icons.save_alt),
+                      label: const Text('保存'),
+                      onPressed: () {
+                        // TODO: 画像保存
+                      },
+                    ),
+                    TextButton.icon(
+                      icon: const Icon(Icons.share),
+                      label: const Text('シェア'),
+                      onPressed: () {
+                        // TODO: シェア
+                      },
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -177,9 +243,8 @@ class _CameraPageState extends State<CameraPage> {
         automaticallyImplyLeading: false,
         actions: [
           IconButton(
-            icon: Icon(Icons.info),
+            icon: const Icon(Icons.info),
             onPressed: () {
-              // ここで画面遷移
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const InfoPage()),
@@ -193,26 +258,6 @@ class _CameraPageState extends State<CameraPage> {
         children: [
           // カメラプレビュー（全画面）
           SizedBox.expand(child: CameraPreview(_controller!)),
-
-          // AIコメント表示エリア（下部）
-          if (_aiComment.isNotEmpty)
-            Positioned(
-              bottom: 100,
-              left: 16,
-              right: 16,
-              child: Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.7),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  _aiComment,
-                  style: const TextStyle(color: Colors.white, fontSize: 16),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            ),
 
           // 撮影ボタン
           Positioned(
