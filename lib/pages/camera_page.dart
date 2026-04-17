@@ -10,6 +10,10 @@ import 'package:share_plus/share_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:cac/main.dart';
 import 'package:cac/pages/info_page.dart';
+import 'package:cac/pages/terms_page.dart';
+import 'package:cac/pages/privacy_page.dart';
+import 'package:cac/pages/contact_page.dart';
+import 'package:cac/pages/licenses_page.dart';
 
 Timer? _timer;
 
@@ -299,9 +303,15 @@ class _CameraPageState extends State<CameraPage> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         automaticallyImplyLeading: false,
+        leading: Builder(
+          builder: (context) => IconButton(
+            icon: const Icon(Icons.menu),
+            onPressed: () => Scaffold.of(context).openDrawer(),
+          ),
+        ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.info),
+            icon: const Icon(Icons.info_outline),
             onPressed: () {
               Navigator.push(
                 context,
@@ -310,6 +320,52 @@ class _CameraPageState extends State<CameraPage> {
             },
           ),
         ],
+      ),
+      drawer: Drawer(
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            const DrawerHeader(
+              decoration: BoxDecoration(color: Colors.orangeAccent),
+              child: Text(
+                'Camera AI',
+                style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.article_outlined),
+              title: const Text('利用規約'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const TermsPage()));
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.privacy_tip_outlined),
+              title: const Text('プライバシーポリシー'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const PrivacyPage()));
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.mail_outline),
+              title: const Text('コンタクト'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const ContactPage()));
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.library_books_outlined),
+              title: const Text('ライブラリ一覧'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const LicensesPage()));
+              },
+            ),
+          ],
+        ),
       ),
       backgroundColor: Colors.black,
       body: Stack(
