@@ -14,8 +14,19 @@ import 'package:cac/pages/terms_page.dart';
 import 'package:cac/pages/privacy_page.dart';
 import 'package:cac/pages/contact_page.dart';
 import 'package:cac/pages/licenses_page.dart';
+import 'package:cac/pages/settings_page.dart';
 
 Timer? _timer;
+
+enum DescriptionMode {
+  descriptive('説明文', 'この画像に写っているものを客観的に日本語と英語で説明してください。'),
+  casual('会話調', 'この画像について、友達に話しかけるような楽しい会話調で日本語と英語で説明してください。'),
+  poem('ポエム', 'この画像からインスピレーションを受けて、詩的・幻想的な表現で日本語と英語で短いポエムを書いてください。');
+
+  final String label;
+  final String prompt;
+  const DescriptionMode(this.label, this.prompt);
+}
 
 class CameraPage extends StatefulWidget {
   const CameraPage({super.key});
@@ -29,6 +40,7 @@ class _CameraPageState extends State<CameraPage> {
   bool _isInitialized = false;
   String? _errorMessage;
   bool _isAnalyzing = false;
+  DescriptionMode _mode = DescriptionMode.descriptive;
 
   @override
   void initState() {
@@ -96,7 +108,7 @@ class _CameraPageState extends State<CameraPage> {
                 {
                   'type': 'text',
                   'text':
-                      'この画像に写っているものを日本語と英語で説明してください。以下のJSON形式のみで返してください。説明文は各言語で2〜3文程度。各文は改行(\\n)で区切ってください。\n{"japanese": "日本語の文1。\\n日本語の文2。", "english": "English sentence 1.\\nEnglish sentence 2."}',
+                      '${_mode.prompt}以下のJSON形式のみで返してください。各文は改行(\\n)で区切ってください。\n{"japanese": "日本語の文1。\\n日本語の文2。", "english": "English sentence 1.\\nEnglish sentence 2."}',
                 },
               ],
             },
@@ -130,14 +142,18 @@ class _CameraPageState extends State<CameraPage> {
     }
   }
 
-  void _showResultSheet(Uint8List? imageBytes, String japanese, String english) {
+  void _showResultSheet(
+    Uint8List? imageBytes,
+    String japanese,
+    String english,
+  ) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) {
         return SizedBox(
-          height: MediaQuery.of(context).size.height * 0.9,
+          height: MediaQuery.of(context).size.height * 0.8,
           child: Container(
             decoration: const BoxDecoration(
               color: Colors.white,
@@ -148,123 +164,137 @@ class _CameraPageState extends State<CameraPage> {
               child: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
-                children: [
-                  // ドラッグハンドル
-                  Container(
-                    width: 40,
-                    height: 4,
-                    margin: const EdgeInsets.only(bottom: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[300],
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                  // 撮影画像
-                  if (imageBytes != null)
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: Image.memory(
-                        imageBytes,
-                        height: 260,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
+                  children: [
+                    // ドラッグハンドル
+                    Container(
+                      width: 40,
+                      height: 4,
+                      margin: const EdgeInsets.only(bottom: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(2),
                       ),
                     ),
-                  const SizedBox(height: 12),
-                  // 日本語
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text('🇯🇵 日本語',
-                        style: TextStyle(fontSize: 12, color: Colors.grey)),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(japanese,
-                      style: const TextStyle(fontSize: 15, color: Colors.black87)),
-                  const SizedBox(height: 12),
-                  const Icon(Icons.swap_horiz, color: Colors.grey),
-                  const SizedBox(height: 12),
-                  // 英語
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text('🇺🇸 English',
-                        style: TextStyle(fontSize: 12, color: Colors.grey)),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(english,
-                      style: const TextStyle(fontSize: 15, color: Colors.black87)),
-                  const SizedBox(height: 20),
-                  // ボタン行
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      TextButton.icon(
-                        icon: const Icon(
-                          Icons.delete_outline,
-                          color: Colors.red,
+                    // 撮影画像
+                    if (imageBytes != null)
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.memory(
+                          imageBytes,
+                          height: 260,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
                         ),
-                        label: const Text(
-                          '破棄',
-                          style: TextStyle(color: Colors.red),
-                        ),
-                        onPressed: () => Navigator.pop(context),
                       ),
-                      TextButton.icon(
-                        icon: const Icon(Icons.save_alt),
-                        label: const Text('保存'),
-                        onPressed: imageBytes == null
-                            ? null
-                            : () async {
-                                final result =
-                                    await ImageGallerySaver.saveImage(
-                                      imageBytes,
-                                    );
-                                if (context.mounted) {
-                                  final success = result['isSuccess'] == true;
-                                  showDialog(
-                                    context: context,
-                                    builder: (ctx) => AlertDialog(
-                                      content: Text(
-                                        success ? '保存しました' : '保存に失敗しました',
-                                        textAlign: TextAlign.center,
-                                      ),
-                                      actionsAlignment:
-                                          MainAxisAlignment.center,
-                                      actions: [
-                                        TextButton(
-                                          onPressed: () => Navigator.pop(ctx),
-                                          child: const Text('OK'),
+                    const SizedBox(height: 12),
+                    // 日本語
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        '🇯🇵 日本語',
+                        style: TextStyle(fontSize: 12, color: Colors.grey),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      japanese,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    const Icon(Icons.swap_horiz, color: Colors.grey),
+                    const SizedBox(height: 12),
+                    // 英語
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        '🇺🇸 English',
+                        style: TextStyle(fontSize: 12, color: Colors.grey),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      english,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    // ボタン行
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        TextButton.icon(
+                          icon: const Icon(
+                            Icons.delete_outline,
+                            color: Colors.red,
+                          ),
+                          label: const Text(
+                            '破棄',
+                            style: TextStyle(color: Colors.red),
+                          ),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                        TextButton.icon(
+                          icon: const Icon(Icons.save_alt),
+                          label: const Text('保存'),
+                          onPressed: imageBytes == null
+                              ? null
+                              : () async {
+                                  final result =
+                                      await ImageGallerySaver.saveImage(
+                                        imageBytes,
+                                      );
+                                  if (context.mounted) {
+                                    final success = result['isSuccess'] == true;
+                                    showDialog(
+                                      context: context,
+                                      builder: (ctx) => AlertDialog(
+                                        content: Text(
+                                          success ? '保存しました' : '保存に失敗しました',
+                                          textAlign: TextAlign.center,
                                         ),
-                                      ],
+                                        actionsAlignment:
+                                            MainAxisAlignment.center,
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () => Navigator.pop(ctx),
+                                            child: const Text('OK'),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  }
+                                },
+                        ),
+                        TextButton.icon(
+                          icon: const Icon(Icons.share),
+                          label: const Text('シェア'),
+                          onPressed: imageBytes == null
+                              ? null
+                              : () async {
+                                  final dir = await getTemporaryDirectory();
+                                  final file = File(
+                                    '${dir.path}/share_image.jpg',
+                                  );
+                                  await file.writeAsBytes(imageBytes);
+                                  await SharePlus.instance.share(
+                                    ShareParams(
+                                      text: '$japanese\n\n$english',
+                                      files: [XFile(file.path)],
                                     ),
                                   );
-                                }
-                              },
-                      ),
-                      TextButton.icon(
-                        icon: const Icon(Icons.share),
-                        label: const Text('シェア'),
-                        onPressed: imageBytes == null
-                            ? null
-                            : () async {
-                                final dir = await getTemporaryDirectory();
-                                final file = File(
-                                  '${dir.path}/share_image.jpg',
-                                );
-                                await file.writeAsBytes(imageBytes);
-                                await SharePlus.instance.share(
-                                  ShareParams(
-                                    text: '$japanese\n\n$english',
-                                    files: [XFile(file.path)],
-                                  ),
-                                );
-                              },
-                      ),
-                    ],
-                  ),
-                ],
+                                },
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
           ),
         );
       },
@@ -329,15 +359,34 @@ class _CameraPageState extends State<CameraPage> {
               decoration: BoxDecoration(color: Colors.orangeAccent),
               child: Text(
                 'Camera AI',
-                style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
+            ListTile(
+              leading: const Icon(Icons.settings_outlined),
+              title: const Text('設定'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const SettingsPage()),
+                );
+              },
+            ),
+            const Divider(),
             ListTile(
               leading: const Icon(Icons.article_outlined),
               title: const Text('利用規約'),
               onTap: () {
                 Navigator.pop(context);
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const TermsPage()));
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const TermsPage()),
+                );
               },
             ),
             ListTile(
@@ -345,7 +394,10 @@ class _CameraPageState extends State<CameraPage> {
               title: const Text('プライバシーポリシー'),
               onTap: () {
                 Navigator.pop(context);
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const PrivacyPage()));
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const PrivacyPage()),
+                );
               },
             ),
             ListTile(
@@ -353,7 +405,10 @@ class _CameraPageState extends State<CameraPage> {
               title: const Text('コンタクト'),
               onTap: () {
                 Navigator.pop(context);
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const ContactPage()));
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ContactPage()),
+                );
               },
             ),
             ListTile(
@@ -361,7 +416,10 @@ class _CameraPageState extends State<CameraPage> {
               title: const Text('ライブラリ一覧'),
               onTap: () {
                 Navigator.pop(context);
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const LicensesPage()));
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const LicensesPage()),
+                );
               },
             ),
           ],
@@ -372,6 +430,36 @@ class _CameraPageState extends State<CameraPage> {
         children: [
           // カメラプレビュー（全画面）
           SizedBox.expand(child: CameraPreview(_controller!)),
+
+          // モード選択チップ
+          Positioned(
+            top: 12,
+            left: 0,
+            right: 0,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Row(
+                children: DescriptionMode.values.map((mode) {
+                  final selected = _mode == mode;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: ChoiceChip(
+                      label: Text(mode.label),
+                      selected: selected,
+                      onSelected: (_) => setState(() => _mode = mode),
+                      selectedColor: Colors.orangeAccent,
+                      backgroundColor: Colors.black54,
+                      labelStyle: TextStyle(
+                        color: selected ? Colors.white : Colors.white70,
+                        fontSize: 12,
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
 
           // 撮影ボタン
           Positioned(
