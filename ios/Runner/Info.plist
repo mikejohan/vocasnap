@@ -71,6 +71,8 @@
     <string>写真を撮影してAIに送信するためにカメラを使用します</string>
     <key>NSMicrophoneUsageDescription</key>
     <string>動画撮影時にマイクを使用します</string>
+    <key>NSPhotoLibraryAddUsageDescription</key>
+    <string>撮影した写真をカメラロールに保存するために使用します</string>
 
 </dict>
 </plist>

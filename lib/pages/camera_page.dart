@@ -1,9 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:http/http.dart' as http;
+import 'package:image_gallery_saver/image_gallery_saver.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:cac/main.dart';
 import 'package:cac/pages/info_page.dart';
 
@@ -188,16 +192,33 @@ class _CameraPageState extends State<CameraPage> {
                     TextButton.icon(
                       icon: const Icon(Icons.save_alt),
                       label: const Text('保存'),
-                      onPressed: () {
-                        // TODO: 画像保存
-                      },
+                      onPressed: imageBytes == null
+                          ? null
+                          : () async {
+                              await ImageGallerySaver.saveImage(imageBytes);
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('保存しました')),
+                                );
+                              }
+                            },
                     ),
                     TextButton.icon(
                       icon: const Icon(Icons.share),
                       label: const Text('シェア'),
-                      onPressed: () {
-                        // TODO: シェア
-                      },
+                      onPressed: imageBytes == null
+                          ? null
+                          : () async {
+                              final dir = await getTemporaryDirectory();
+                              final file = File('${dir.path}/share_image.jpg');
+                              await file.writeAsBytes(imageBytes);
+                              await SharePlus.instance.share(
+                                ShareParams(
+                                  text: comment,
+                                  files: [XFile(file.path)],
+                                ),
+                              );
+                            },
                     ),
                   ],
                 ),
