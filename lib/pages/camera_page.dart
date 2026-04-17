@@ -138,105 +138,117 @@ class _CameraPageState extends State<CameraPage> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) {
-        return Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          padding: const EdgeInsets.all(16),
-          child: SafeArea(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // ドラッグハンドル
-                Container(
-                  width: 40,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 12),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[300],
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                // 撮影画像
-                if (imageBytes != null)
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Image.memory(
-                      imageBytes,
-                      height: 260,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
+        return SizedBox(
+          height: MediaQuery.of(context).size.height * 0.9,
+          child: Container(
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            padding: const EdgeInsets.all(16),
+            child: SafeArea(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // ドラッグハンドル
+                  Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(2),
                     ),
                   ),
-                const SizedBox(height: 12),
-                // AIコメント
-                Text(
-                  comment,
-                  style: const TextStyle(fontSize: 16),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 20),
-                // ボタン行
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    TextButton.icon(
-                      icon: const Icon(Icons.delete_outline, color: Colors.red),
-                      label: const Text(
-                        '破棄',
-                        style: TextStyle(color: Colors.red),
+                  // 撮影画像
+                  if (imageBytes != null)
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.memory(
+                        imageBytes,
+                        height: 260,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
                       ),
-                      onPressed: () => Navigator.pop(context),
                     ),
-                    TextButton.icon(
-                      icon: const Icon(Icons.save_alt),
-                      label: const Text('保存'),
-                      onPressed: imageBytes == null
-                          ? null
-                          : () async {
-                              final result = await ImageGallerySaver.saveImage(imageBytes);
-                              if (context.mounted) {
-                                final success = result['isSuccess'] == true;
-                                showDialog(
-                                  context: context,
-                                  builder: (ctx) => AlertDialog(
-                                    content: Text(
-                                      success ? '保存しました' : '保存に失敗しました',
-                                      textAlign: TextAlign.center,
-                                    ),
-                                    actionsAlignment: MainAxisAlignment.center,
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () => Navigator.pop(ctx),
-                                        child: const Text('OK'),
+                  const SizedBox(height: 12),
+                  // AIコメント
+                  Text(
+                    comment,
+                    style: const TextStyle(fontSize: 16),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 20),
+                  // ボタン行
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      TextButton.icon(
+                        icon: const Icon(
+                          Icons.delete_outline,
+                          color: Colors.red,
+                        ),
+                        label: const Text(
+                          '破棄',
+                          style: TextStyle(color: Colors.red),
+                        ),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                      TextButton.icon(
+                        icon: const Icon(Icons.save_alt),
+                        label: const Text('保存'),
+                        onPressed: imageBytes == null
+                            ? null
+                            : () async {
+                                final result =
+                                    await ImageGallerySaver.saveImage(
+                                      imageBytes,
+                                    );
+                                if (context.mounted) {
+                                  final success = result['isSuccess'] == true;
+                                  showDialog(
+                                    context: context,
+                                    builder: (ctx) => AlertDialog(
+                                      content: Text(
+                                        success ? '保存しました' : '保存に失敗しました',
+                                        textAlign: TextAlign.center,
                                       ),
-                                    ],
+                                      actionsAlignment:
+                                          MainAxisAlignment.center,
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () => Navigator.pop(ctx),
+                                          child: const Text('OK'),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }
+                              },
+                      ),
+                      TextButton.icon(
+                        icon: const Icon(Icons.share),
+                        label: const Text('シェア'),
+                        onPressed: imageBytes == null
+                            ? null
+                            : () async {
+                                final dir = await getTemporaryDirectory();
+                                final file = File(
+                                  '${dir.path}/share_image.jpg',
+                                );
+                                await file.writeAsBytes(imageBytes);
+                                await SharePlus.instance.share(
+                                  ShareParams(
+                                    text: comment,
+                                    files: [XFile(file.path)],
                                   ),
                                 );
-                              }
-                            },
-                    ),
-                    TextButton.icon(
-                      icon: const Icon(Icons.share),
-                      label: const Text('シェア'),
-                      onPressed: imageBytes == null
-                          ? null
-                          : () async {
-                              final dir = await getTemporaryDirectory();
-                              final file = File('${dir.path}/share_image.jpg');
-                              await file.writeAsBytes(imageBytes);
-                              await SharePlus.instance.share(
-                                ShareParams(
-                                  text: comment,
-                                  files: [XFile(file.path)],
-                                ),
-                              );
-                            },
-                    ),
-                  ],
-                ),
-              ],
+                              },
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         );
