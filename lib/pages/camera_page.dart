@@ -15,6 +15,7 @@ import 'package:cac/pages/privacy_page.dart';
 import 'package:cac/pages/contact_page.dart';
 import 'package:cac/pages/licenses_page.dart';
 import 'package:cac/pages/settings_page.dart';
+import 'package:flutter_tts/flutter_tts.dart';
 
 Timer? _timer;
 
@@ -41,14 +42,32 @@ class _CameraPageState extends State<CameraPage> {
   String? _errorMessage;
   bool _isAnalyzing = false;
   DescriptionMode _mode = DescriptionMode.descriptive;
+  final FlutterTts _tts = FlutterTts();
 
   @override
   void initState() {
     super.initState();
     _initCamera();
+    _initTts();
     Future.delayed(const Duration(seconds: 3), () {
       _analyzeImage();
     });
+  }
+
+  Future<void> _initTts() async {
+    await _tts.setLanguage('en-US');
+    await _tts.setSpeechRate(0.45);
+    // premium音声が利用可能であれば優先して使用
+    final voices = await _tts.getVoices as List?;
+    if (voices != null) {
+      final premium = voices.cast<Map>().where((v) {
+        final name = (v['name'] as String? ?? '').toLowerCase();
+        return v['locale'] == 'en-US' && name.contains('premium');
+      }).toList();
+      if (premium.isNotEmpty) {
+        await _tts.setVoice({'name': premium.first['name'], 'locale': 'en-US'});
+      }
+    }
   }
 
   Future<void> _initCamera() async {
@@ -207,12 +226,20 @@ class _CameraPageState extends State<CameraPage> {
                     const Icon(Icons.swap_horiz, color: Colors.grey),
                     const SizedBox(height: 12),
                     // 英語
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        '🇺🇸 English',
-                        style: TextStyle(fontSize: 12, color: Colors.grey),
-                      ),
+                    Row(
+                      children: [
+                        const Text(
+                          '🇺🇸 English',
+                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                        ),
+                        const Spacer(),
+                        IconButton(
+                          icon: const Icon(Icons.volume_up, size: 20, color: Colors.grey),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                          onPressed: english.isEmpty ? null : () => _tts.speak(english),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 4),
                     Text(
