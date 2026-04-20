@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cac/constants.dart';
+import 'package:cac/widgets/gradient_background.dart';
 
 class ContactPage extends StatelessWidget {
   const ContactPage({super.key});
@@ -8,8 +9,9 @@ class ContactPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.transparent,
       appBar: AppBar(title: const Text('コンタクト')),
-      body: Padding(
+      body: GradientBackground(child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -65,7 +67,7 @@ class ContactPage extends StatelessWidget {
             ),
           ],
         ),
-      ),
+      )),
     );
   }
 }

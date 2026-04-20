@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cac/widgets/gradient_background.dart';
 
 class InfoPage extends StatelessWidget {
   const InfoPage({super.key});
@@ -6,8 +7,9 @@ class InfoPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.transparent,
       appBar: AppBar(title: const Text('使い方')),
-      body: SingleChildScrollView(
+      body: GradientBackground(child: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -80,7 +82,7 @@ class InfoPage extends StatelessWidget {
             ),
           ],
         ),
-      ),
+      )),
     );
   }
 }

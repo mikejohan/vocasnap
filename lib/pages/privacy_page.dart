@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cac/constants.dart';
+import 'package:cac/widgets/gradient_background.dart';
 
 class PrivacyPage extends StatelessWidget {
   const PrivacyPage({super.key});
@@ -7,8 +8,9 @@ class PrivacyPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.transparent,
       appBar: AppBar(title: const Text('プライバシーポリシー')),
-      body: SingleChildScrollView(
+      body: GradientBackground(child: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -29,7 +31,7 @@ class PrivacyPage extends StatelessWidget {
                 '本ポリシーに関するお問い合わせは下記までご連絡ください。\n$kContactEmail'),
           ],
         ),
-      ),
+      )),
     );
   }
 

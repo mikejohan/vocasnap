@@ -19,9 +19,9 @@ import 'package:cac/pages/licenses_page.dart';
 import 'package:cac/pages/settings_page.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 
-Timer? _timer;
+import '../constants.dart';
 
-const int kDailyApiLimit = 13;
+Timer? _timer;
 
 enum DescriptionMode {
   descriptive('説明文', 'この画像に写っているものを客観的に日本語と英語で説明してください。'),
@@ -511,13 +511,24 @@ class _CameraPageState extends State<CameraPage> {
           children: [
             const DrawerHeader(
               decoration: BoxDecoration(color: Colors.orangeAccent),
-              child: Text(
-                'Camera AI',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    kAppName,
+                    style: TextStyle(
+                      color: Colors.indigoAccent,
+                      fontSize: 38,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  SizedBox(height: 6),
+                  Text(
+                    kAppSubTitle,
+                    style: TextStyle(color: Colors.indigoAccent, fontSize: 13),
+                  ),
+                ],
               ),
             ),
             ListTile(

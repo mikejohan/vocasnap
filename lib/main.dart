@@ -3,12 +3,14 @@
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:cac/pages/landing_page.dart';
+import 'package:cac/theme/gradient_config.dart';
 
 List<CameraDescription> cameras = [];
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   cameras = await availableCameras();
+  await loadGradientConfig();
   runApp(const MyApp());
 }
 

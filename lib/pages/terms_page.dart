@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cac/constants.dart';
+import 'package:cac/widgets/gradient_background.dart';
 
 class TermsPage extends StatelessWidget {
   const TermsPage({super.key});
@@ -7,8 +8,9 @@ class TermsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.transparent,
       appBar: AppBar(title: const Text('利用規約')),
-      body: SingleChildScrollView(
+      body: GradientBackground(child: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -29,7 +31,7 @@ class TermsPage extends StatelessWidget {
                 '本規約に関するお問い合わせは下記までご連絡ください。\n$kContactEmail'),
           ],
         ),
-      ),
+      )),
     );
   }
 
