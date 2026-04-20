@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 import 'package:image_gallery_saver/image_gallery_saver.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:flutter/services.dart';
 import 'package:cac/main.dart';
 import 'package:cac/pages/info_page.dart';
 import 'package:cac/pages/terms_page.dart';
@@ -171,6 +172,10 @@ class _CameraPageState extends State<CameraPage> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) {
+        bool isSpeaking = false;
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+        _tts.setCompletionHandler(() => setSheetState(() => isSpeaking = false));
         return SizedBox(
           height: MediaQuery.of(context).size.height * 0.8,
           child: Container(
@@ -234,10 +239,22 @@ class _CameraPageState extends State<CameraPage> {
                         ),
                         const Spacer(),
                         IconButton(
-                          icon: const Icon(Icons.volume_up, size: 20, color: Colors.grey),
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                          onPressed: english.isEmpty ? null : () => _tts.speak(english),
+                          icon: Icon(
+                            isSpeaking ? Icons.stop_circle_outlined : Icons.volume_up,
+                            size: 32,
+                            color: isSpeaking ? Colors.orangeAccent : Colors.grey,
+                          ),
+                          onPressed: english.isEmpty
+                              ? null
+                              : () async {
+                                  if (isSpeaking) {
+                                    await _tts.stop();
+                                    setSheetState(() => isSpeaking = false);
+                                  } else {
+                                    setSheetState(() => isSpeaking = true);
+                                    await _tts.speak(english);
+                                  }
+                                },
                         ),
                       ],
                     ),
@@ -251,6 +268,40 @@ class _CameraPageState extends State<CameraPage> {
                     ),
                     const SizedBox(height: 20),
                     // ボタン行
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton.icon(
+                          icon: const Icon(Icons.copy, size: 16),
+                          label: const Text('テキストをコピー'),
+                          onPressed: () async {
+                            try {
+                              await Clipboard.setData(ClipboardData(
+                                text: '$japanese\n\n$english',
+                              ));
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('コピーしました'),
+                                    duration: Duration(seconds: 2),
+                                  ),
+                                );
+                              }
+                            } catch (_) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('コピーに失敗しました'),
+                                    duration: Duration(seconds: 2),
+                                  ),
+                                );
+                              }
+                            }
+                          },
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
@@ -323,6 +374,8 @@ class _CameraPageState extends State<CameraPage> {
               ),
             ),
           ),
+        );
+          },
         );
       },
     );
