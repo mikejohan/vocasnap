@@ -9,6 +9,7 @@ import 'package:image_gallery_saver/image_gallery_saver.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cac/main.dart';
 import 'package:cac/pages/info_page.dart';
 import 'package:cac/pages/terms_page.dart';
@@ -19,6 +20,8 @@ import 'package:cac/pages/settings_page.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 
 Timer? _timer;
+
+const int kDailyApiLimit = 13;
 
 enum DescriptionMode {
   descriptive('説明文', 'この画像に写っているものを客観的に日本語と英語で説明してください。'),
@@ -44,15 +47,27 @@ class _CameraPageState extends State<CameraPage> {
   bool _isAnalyzing = false;
   DescriptionMode _mode = DescriptionMode.descriptive;
   final FlutterTts _tts = FlutterTts();
+  int _remainingCount = kDailyApiLimit;
 
   @override
   void initState() {
     super.initState();
     _initCamera();
     _initTts();
+    _loadRemainingCount();
     Future.delayed(const Duration(seconds: 3), () {
       _analyzeImage();
     });
+  }
+
+  Future<void> _loadRemainingCount() async {
+    final prefs = await SharedPreferences.getInstance();
+    final today = DateTime.now().toIso8601String().substring(0, 10);
+    final savedDate = prefs.getString('api_call_date') ?? '';
+    final count = savedDate == today
+        ? (prefs.getInt('api_call_count') ?? 0)
+        : 0;
+    if (mounted) setState(() => _remainingCount = kDailyApiLimit - count);
   }
 
   Future<void> _initTts() async {
@@ -96,9 +111,51 @@ class _CameraPageState extends State<CameraPage> {
     }
   }
 
+  Future<bool> _checkDailyLimit() async {
+    final prefs = await SharedPreferences.getInstance();
+    final today = DateTime.now().toIso8601String().substring(0, 10);
+    final savedDate = prefs.getString('api_call_date') ?? '';
+    int count = prefs.getInt('api_call_count') ?? 0;
+
+    if (savedDate != today) {
+      count = 0;
+      await prefs.setString('api_call_date', today);
+    }
+
+    if (count >= kDailyApiLimit) return false;
+
+    await prefs.setInt('api_call_count', count + 1);
+    return true;
+  }
+
   Future<void> _analyzeImage() async {
     if (_isAnalyzing || _controller == null) return;
     if (!_controller!.value.isInitialized) return;
+
+    final allowed = await _checkDailyLimit();
+    if (mounted)
+      setState(() => _remainingCount = allowed ? _remainingCount - 1 : 0);
+    if (!allowed) {
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            content: const Text(
+              '本日の利用上限（$kDailyApiLimit回）に達しました。\n翌日またご利用ください。',
+              textAlign: TextAlign.center,
+            ),
+            actionsAlignment: MainAxisAlignment.center,
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+      }
+      return;
+    }
 
     setState(() => _isAnalyzing = true);
 
@@ -175,206 +232,219 @@ class _CameraPageState extends State<CameraPage> {
         bool isSpeaking = false;
         return StatefulBuilder(
           builder: (context, setSheetState) {
-        _tts.setCompletionHandler(() => setSheetState(() => isSpeaking = false));
-        return SizedBox(
-          height: MediaQuery.of(context).size.height * 0.8,
-          child: Container(
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-            ),
-            padding: const EdgeInsets.all(16),
-            child: SafeArea(
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // ドラッグハンドル
-                    Container(
-                      width: 40,
-                      height: 4,
-                      margin: const EdgeInsets.only(bottom: 12),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[300],
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                    // 撮影画像
-                    if (imageBytes != null)
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: Image.memory(
-                          imageBytes,
-                          height: 260,
-                          width: double.infinity,
-                          fit: BoxFit.cover,
-                        ),
-                      ),
-                    const SizedBox(height: 12),
-                    // 日本語
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        '🇯🇵 日本語',
-                        style: TextStyle(fontSize: 12, color: Colors.grey),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      japanese,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        color: Colors.black87,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    const Icon(Icons.swap_horiz, color: Colors.grey),
-                    const SizedBox(height: 12),
-                    // 英語
-                    Row(
+            _tts.setCompletionHandler(
+              () => setSheetState(() => isSpeaking = false),
+            );
+            return SizedBox(
+              height: MediaQuery.of(context).size.height * 0.8,
+              child: Container(
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                ),
+                padding: const EdgeInsets.all(16),
+                child: SafeArea(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Text(
-                          '🇺🇸 English',
-                          style: TextStyle(fontSize: 12, color: Colors.grey),
-                        ),
-                        const Spacer(),
-                        IconButton(
-                          icon: Icon(
-                            isSpeaking ? Icons.stop_circle_outlined : Icons.volume_up,
-                            size: 32,
-                            color: isSpeaking ? Colors.orangeAccent : Colors.grey,
+                        // ドラッグハンドル
+                        Container(
+                          width: 40,
+                          height: 4,
+                          margin: const EdgeInsets.only(bottom: 12),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[300],
+                            borderRadius: BorderRadius.circular(2),
                           ),
-                          onPressed: english.isEmpty
-                              ? null
-                              : () async {
-                                  if (isSpeaking) {
-                                    await _tts.stop();
-                                    setSheetState(() => isSpeaking = false);
-                                  } else {
-                                    setSheetState(() => isSpeaking = true);
-                                    await _tts.speak(english);
-                                  }
-                                },
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      english,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        color: Colors.black87,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    // ボタン行
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        TextButton.icon(
-                          icon: const Icon(Icons.copy, size: 16),
-                          label: const Text('テキストをコピー'),
-                          onPressed: () async {
-                            try {
-                              await Clipboard.setData(ClipboardData(
-                                text: '$japanese\n\n$english',
-                              ));
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('コピーしました'),
-                                    duration: Duration(seconds: 2),
-                                  ),
-                                );
-                              }
-                            } catch (_) {
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('コピーに失敗しました'),
-                                    duration: Duration(seconds: 2),
-                                  ),
-                                );
-                              }
-                            }
-                          },
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        TextButton.icon(
-                          icon: const Icon(
-                            Icons.delete_outline,
-                            color: Colors.red,
+                        // 撮影画像
+                        if (imageBytes != null)
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: Image.memory(
+                              imageBytes,
+                              height: 260,
+                              width: double.infinity,
+                              fit: BoxFit.cover,
+                            ),
                           ),
-                          label: const Text(
-                            '破棄',
-                            style: TextStyle(color: Colors.red),
+                        const SizedBox(height: 12),
+                        // 日本語
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            '🇯🇵 日本語',
+                            style: TextStyle(fontSize: 12, color: Colors.grey),
                           ),
-                          onPressed: () => Navigator.pop(context),
                         ),
-                        TextButton.icon(
-                          icon: const Icon(Icons.save_alt),
-                          label: const Text('保存'),
-                          onPressed: imageBytes == null
-                              ? null
-                              : () async {
-                                  final result =
-                                      await ImageGallerySaver.saveImage(
-                                        imageBytes,
-                                      );
+                        const SizedBox(height: 4),
+                        Text(
+                          japanese,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            color: Colors.black87,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        const Icon(Icons.swap_horiz, color: Colors.grey),
+                        const SizedBox(height: 12),
+                        // 英語
+                        Row(
+                          children: [
+                            const Text(
+                              '🇺🇸 English',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey,
+                              ),
+                            ),
+                            const Spacer(),
+                            IconButton(
+                              icon: Icon(
+                                isSpeaking
+                                    ? Icons.stop_circle_outlined
+                                    : Icons.volume_up,
+                                size: 32,
+                                color: isSpeaking
+                                    ? Colors.orangeAccent
+                                    : Colors.grey,
+                              ),
+                              onPressed: english.isEmpty
+                                  ? null
+                                  : () async {
+                                      if (isSpeaking) {
+                                        await _tts.stop();
+                                        setSheetState(() => isSpeaking = false);
+                                      } else {
+                                        setSheetState(() => isSpeaking = true);
+                                        await _tts.speak(english);
+                                      }
+                                    },
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          english,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            color: Colors.black87,
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        // ボタン行
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            TextButton.icon(
+                              icon: const Icon(Icons.copy, size: 16),
+                              label: const Text('テキストをコピー'),
+                              onPressed: () async {
+                                try {
+                                  await Clipboard.setData(
+                                    ClipboardData(
+                                      text: '$japanese\n\n$english',
+                                    ),
+                                  );
                                   if (context.mounted) {
-                                    final success = result['isSuccess'] == true;
-                                    showDialog(
-                                      context: context,
-                                      builder: (ctx) => AlertDialog(
-                                        content: Text(
-                                          success ? '保存しました' : '保存に失敗しました',
-                                          textAlign: TextAlign.center,
-                                        ),
-                                        actionsAlignment:
-                                            MainAxisAlignment.center,
-                                        actions: [
-                                          TextButton(
-                                            onPressed: () => Navigator.pop(ctx),
-                                            child: const Text('OK'),
-                                          ),
-                                        ],
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('コピーしました'),
+                                        duration: Duration(seconds: 2),
                                       ),
                                     );
                                   }
-                                },
+                                } catch (_) {
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('コピーに失敗しました'),
+                                        duration: Duration(seconds: 2),
+                                      ),
+                                    );
+                                  }
+                                }
+                              },
+                            ),
+                          ],
                         ),
-                        TextButton.icon(
-                          icon: const Icon(Icons.share),
-                          label: const Text('シェア'),
-                          onPressed: imageBytes == null
-                              ? null
-                              : () async {
-                                  final dir = await getTemporaryDirectory();
-                                  final file = File(
-                                    '${dir.path}/share_image.jpg',
-                                  );
-                                  await file.writeAsBytes(imageBytes);
-                                  await SharePlus.instance.share(
-                                    ShareParams(
-                                      text: '$japanese\n\n$english',
-                                      files: [XFile(file.path)],
-                                    ),
-                                  );
-                                },
+                        const SizedBox(height: 4),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            TextButton.icon(
+                              icon: const Icon(
+                                Icons.delete_outline,
+                                color: Colors.red,
+                              ),
+                              label: const Text(
+                                '破棄',
+                                style: TextStyle(color: Colors.red),
+                              ),
+                              onPressed: () => Navigator.pop(context),
+                            ),
+                            TextButton.icon(
+                              icon: const Icon(Icons.save_alt),
+                              label: const Text('保存'),
+                              onPressed: imageBytes == null
+                                  ? null
+                                  : () async {
+                                      final result =
+                                          await ImageGallerySaver.saveImage(
+                                            imageBytes,
+                                          );
+                                      if (context.mounted) {
+                                        final success =
+                                            result['isSuccess'] == true;
+                                        showDialog(
+                                          context: context,
+                                          builder: (ctx) => AlertDialog(
+                                            content: Text(
+                                              success ? '保存しました' : '保存に失敗しました',
+                                              textAlign: TextAlign.center,
+                                            ),
+                                            actionsAlignment:
+                                                MainAxisAlignment.center,
+                                            actions: [
+                                              TextButton(
+                                                onPressed: () =>
+                                                    Navigator.pop(ctx),
+                                                child: const Text('OK'),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                      }
+                                    },
+                            ),
+                            TextButton.icon(
+                              icon: const Icon(Icons.share),
+                              label: const Text('シェア'),
+                              onPressed: imageBytes == null
+                                  ? null
+                                  : () async {
+                                      final dir = await getTemporaryDirectory();
+                                      final file = File(
+                                        '${dir.path}/share_image.jpg',
+                                      );
+                                      await file.writeAsBytes(imageBytes);
+                                      await SharePlus.instance.share(
+                                        ShareParams(
+                                          text: '$japanese\n\n$english',
+                                          files: [XFile(file.path)],
+                                        ),
+                                      );
+                                    },
+                            ),
+                          ],
                         ),
                       ],
                     ),
-                  ],
+                  ),
                 ),
               ),
-            ),
-          ),
-        );
+            );
           },
         );
       },
@@ -413,6 +483,10 @@ class _CameraPageState extends State<CameraPage> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         automaticallyImplyLeading: false,
+        title: Text(
+          '本日${kDailyApiLimit - _remainingCount}回利用、残り $_remainingCount 回です。',
+          style: const TextStyle(fontSize: 14, color: Colors.black54),
+        ),
         leading: Builder(
           builder: (context) => IconButton(
             icon: const Icon(Icons.menu),
