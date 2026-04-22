@@ -404,16 +404,33 @@ class _CameraPageState extends State<CameraPage> {
                                   IconButton(
                                     icon: const Icon(Icons.share, size: 22, color: Colors.grey),
                                     onPressed: () async {
+                                      final buffer = StringBuffer();
+                                      buffer.writeln(jaLines[i]);
+                                      buffer.writeln();
+                                      buffer.write(enLines[i]);
+                                      final data = learnMoreData[i];
+                                      if (data != null) {
+                                        buffer.writeln('\n');
+                                        buffer.writeln('--- 別の表現 ---');
+                                        buffer.writeln(data['alternative'] ?? '');
+                                        buffer.writeln();
+                                        buffer.writeln('--- 文法のポイント ---');
+                                        for (final hint in (data['grammar_hints'] as List? ?? [])) {
+                                          buffer.writeln('• $hint');
+                                        }
+                                      }
+                                      final shareText = buffer.toString().trim();
+                                      await Clipboard.setData(ClipboardData(text: shareText));
                                       final dir = await getTemporaryDirectory();
                                       final params = imageBytes != null
                                           ? ShareParams(
-                                              text: '${jaLines[i]}\n\n${enLines[i]}',
+                                              text: shareText,
                                               files: [
                                                 XFile((await File('${dir.path}/share_image.jpg')
                                                     ..writeAsBytes(imageBytes)).path),
                                               ],
                                             )
-                                          : ShareParams(text: '${jaLines[i]}\n\n${enLines[i]}');
+                                          : ShareParams(text: shareText);
                                       await SharePlus.instance.share(params);
                                     },
                                   ),
