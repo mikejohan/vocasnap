@@ -235,11 +235,48 @@ class _CameraPageState extends State<CameraPage> {
       builder: (context) {
         int? speakingIndex;
         final revealedIndices = <int>{};
+        final learnMoreLoading = <int, bool>{};
+        final learnMoreData = <int, Map<String, dynamic>?>{};
         return StatefulBuilder(
           builder: (context, setSheetState) {
             _tts.setCompletionHandler(
               () => setSheetState(() => speakingIndex = null),
             );
+
+            Future<void> fetchLearnMore(int idx, String ja, String en) async {
+              setSheetState(() => learnMoreLoading[idx] = true);
+              try {
+                final response = await http.post(
+                  Uri.parse('https://rapid-band-c3f6.johanmike549.workers.dev'),
+                  headers: {'Content-Type': 'application/json'},
+                  body: jsonEncode({
+                    'model': 'claude-haiku-4-5',
+                    'max_tokens': 400,
+                    'messages': [
+                      {
+                        'role': 'user',
+                        'content':
+                            '以下の日本語文とその英訳について、英語学習に役立つ情報をJSON形式のみで返してください。\n{"alternative": "別の表現・語彙を使った英訳", "grammar_hints": ["文法ポイント1", "文法ポイント2"]}\n\n日本語: $ja\n英語: $en',
+                      },
+                    ],
+                  }),
+                );
+                if (response.statusCode == 200) {
+                  final data = jsonDecode(response.body);
+                  final raw = data['content'][0]['text'] as String;
+                  final text = raw.replaceAll(RegExp(r'```json|```'), '').trim();
+                  final parsed = jsonDecode(text) as Map<String, dynamic>;
+                  setSheetState(() {
+                    learnMoreData[idx] = parsed;
+                    learnMoreLoading[idx] = false;
+                  });
+                } else {
+                  setSheetState(() => learnMoreLoading[idx] = false);
+                }
+              } catch (_) {
+                setSheetState(() => learnMoreLoading[idx] = false);
+              }
+            }
             return SizedBox(
               height: MediaQuery.of(context).size.height * 0.8,
               child: Container(
@@ -382,6 +419,62 @@ class _CameraPageState extends State<CameraPage> {
                                   ),
                                 ],
                               ));
+                              // もっと学ぶ
+                              if (learnMoreLoading[i] == true) {
+                                widgets.add(const Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 8),
+                                  child: Center(child: CircularProgressIndicator(strokeWidth: 2, color: Colors.orangeAccent)),
+                                ));
+                              } else if (learnMoreData.containsKey(i) && learnMoreData[i] != null) {
+                                final data = learnMoreData[i]!;
+                                widgets.add(Container(
+                                  margin: const EdgeInsets.only(top: 8),
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: Colors.orange.shade50,
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text('別の表現', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                                      const SizedBox(height: 4),
+                                      SelectableText(
+                                        data['alternative'] as String? ?? '',
+                                        style: const TextStyle(fontSize: 15, color: Colors.black87),
+                                      ),
+                                      const SizedBox(height: 12),
+                                      const Text('文法のポイント', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                                      const SizedBox(height: 4),
+                                      ...(data['grammar_hints'] as List? ?? []).map((hint) => Padding(
+                                        padding: const EdgeInsets.only(bottom: 4),
+                                        child: Row(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            const Icon(Icons.label_outline, size: 14, color: Colors.orangeAccent),
+                                            const SizedBox(width: 4),
+                                            Expanded(
+                                              child: SelectableText(
+                                                hint as String,
+                                                style: const TextStyle(fontSize: 14, color: Colors.black87),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      )),
+                                    ],
+                                  ),
+                                ));
+                              } else {
+                                widgets.add(Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: TextButton.icon(
+                                    icon: const Icon(Icons.auto_stories_outlined, size: 16),
+                                    label: const Text('もっと学ぶ'),
+                                    onPressed: () => fetchLearnMore(i, jaLines[i], enLines[i]),
+                                  ),
+                                ));
+                              }
                             } else {
                               widgets.add(GestureDetector(
                                 onTap: () => setSheetState(() => revealedIndices.add(i)),
