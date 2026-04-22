@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:io';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:http/http.dart' as http;
@@ -232,6 +233,7 @@ class _CameraPageState extends State<CameraPage> {
       backgroundColor: Colors.transparent,
       builder: (context) {
         int? speakingIndex;
+        final revealedIndices = <int>{};
         return StatefulBuilder(
           builder: (context, setSheetState) {
             _tts.setCompletionHandler(
@@ -287,40 +289,63 @@ class _CameraPageState extends State<CameraPage> {
                             widgets.add(const SizedBox(height: 8));
                             widgets.add(const Icon(Icons.swap_horiz, color: Colors.grey));
                             widgets.add(const SizedBox(height: 8));
-                            widgets.add(Row(
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                Expanded(
-                                  child: SelectableText(
-                                    enLines[i],
-                                    style: const TextStyle(fontSize: 15, color: Colors.black87),
+                            final revealed = revealedIndices.contains(i);
+                            if (revealed) {
+                              widgets.add(Row(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  Expanded(
+                                    child: SelectableText(
+                                      enLines[i],
+                                      style: const TextStyle(fontSize: 15, color: Colors.black87),
+                                    ),
                                   ),
-                                ),
-                                IconButton(
-                                  icon: Icon(
-                                    speakingIndex == i
-                                        ? Icons.stop_circle_outlined
-                                        : Icons.volume_up,
-                                    size: 24,
-                                    color: speakingIndex == i
-                                        ? Colors.orangeAccent
-                                        : Colors.grey,
+                                  IconButton(
+                                    icon: Icon(
+                                      speakingIndex == i
+                                          ? Icons.stop_circle_outlined
+                                          : Icons.volume_up,
+                                      size: 24,
+                                      color: speakingIndex == i
+                                          ? Colors.orangeAccent
+                                          : Colors.grey,
+                                    ),
+                                    onPressed: () async {
+                                      if (speakingIndex == i) {
+                                        await _tts.stop();
+                                        setSheetState(() => speakingIndex = null);
+                                      } else {
+                                        final prefs = await SharedPreferences.getInstance();
+                                        final rate = prefs.getDouble(kTtsSpeechRateKey) ?? kTtsSpeechRateDefault;
+                                        await _tts.setSpeechRate(rate);
+                                        setSheetState(() => speakingIndex = i);
+                                        await _tts.speak(enLines[i]);
+                                      }
+                                    },
                                   ),
-                                  onPressed: () async {
-                                    if (speakingIndex == i) {
-                                      await _tts.stop();
-                                      setSheetState(() => speakingIndex = null);
-                                    } else {
-                                      final prefs = await SharedPreferences.getInstance();
-                                      final rate = prefs.getDouble(kTtsSpeechRateKey) ?? kTtsSpeechRateDefault;
-                                      await _tts.setSpeechRate(rate);
-                                      setSheetState(() => speakingIndex = i);
-                                      await _tts.speak(enLines[i]);
-                                    }
-                                  },
+                                ],
+                              ));
+                            } else {
+                              widgets.add(GestureDetector(
+                                onTap: () => setSheetState(() => revealedIndices.add(i)),
+                                child: Stack(
+                                  alignment: Alignment.center,
+                                  children: [
+                                    ImageFiltered(
+                                      imageFilter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
+                                      child: Text(
+                                        enLines[i],
+                                        style: const TextStyle(fontSize: 15, color: Colors.black87),
+                                      ),
+                                    ),
+                                    const Text(
+                                      'タップして表示',
+                                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                                    ),
+                                  ],
                                 ),
-                              ],
-                            ));
+                              ));
+                            }
                           }
                           return widgets;
                         }(),
