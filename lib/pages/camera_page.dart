@@ -72,7 +72,9 @@ class _CameraPageState extends State<CameraPage> {
 
   Future<void> _initTts() async {
     await _tts.setLanguage('en-US');
-    await _tts.setSpeechRate(0.45);
+    final prefs = await SharedPreferences.getInstance();
+    final rate = prefs.getDouble(kTtsSpeechRateKey) ?? kTtsSpeechRateDefault;
+    await _tts.setSpeechRate(rate);
     // premium音声が利用可能であれば優先して使用
     final voices = await _tts.getVoices as List?;
     if (voices != null) {
@@ -317,6 +319,9 @@ class _CameraPageState extends State<CameraPage> {
                                         await _tts.stop();
                                         setSheetState(() => isSpeaking = false);
                                       } else {
+                                        final prefs = await SharedPreferences.getInstance();
+                                        final rate = prefs.getDouble(kTtsSpeechRateKey) ?? kTtsSpeechRateDefault;
+                                        await _tts.setSpeechRate(rate);
                                         setSheetState(() => isSpeaking = true);
                                         await _tts.speak(english);
                                       }
