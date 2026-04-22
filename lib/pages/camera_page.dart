@@ -274,6 +274,46 @@ class _CameraPageState extends State<CameraPage> {
                               fit: BoxFit.cover,
                             ),
                           ),
+                        if (imageBytes != null)
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton.icon(
+                              icon: const Icon(Icons.save_alt, size: 16),
+                              label: const Text('画像を保存'),
+                              onPressed: () async {
+                                final result = await ImageGallerySaver.saveImage(imageBytes);
+                                if (context.mounted) {
+                                  final success = result['isSuccess'] == true;
+                                  showDialog(
+                                    context: context,
+                                    builder: (ctx) => AlertDialog(
+                                      content: Text(
+                                        success
+                                            ? '保存しました'
+                                            : '写真へのアクセスが許可されていません。\n\n設定 → Vocasnap → 写真\nから「追加のみ」または「すべての写真」を選択してください。',
+                                        textAlign: TextAlign.center,
+                                      ),
+                                      actionsAlignment: MainAxisAlignment.center,
+                                      actions: [
+                                        if (!success)
+                                          TextButton(
+                                            onPressed: () async {
+                                              Navigator.pop(ctx);
+                                              await launchUrl(Uri.parse('app-settings:'));
+                                            },
+                                            child: const Text('設定を開く'),
+                                          ),
+                                        TextButton(
+                                          onPressed: () => Navigator.pop(ctx),
+                                          child: Text(success ? 'OK' : '閉じる'),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }
+                              },
+                            ),
+                          ),
                         const SizedBox(height: 12),
                         // 文ごとのペア表示（各ペアに読み上げボタン）
                         ...() {
@@ -324,6 +364,22 @@ class _CameraPageState extends State<CameraPage> {
                                       }
                                     },
                                   ),
+                                  IconButton(
+                                    icon: const Icon(Icons.share, size: 22, color: Colors.grey),
+                                    onPressed: () async {
+                                      final dir = await getTemporaryDirectory();
+                                      final params = imageBytes != null
+                                          ? ShareParams(
+                                              text: '${jaLines[i]}\n\n${enLines[i]}',
+                                              files: [
+                                                XFile((await File('${dir.path}/share_image.jpg')
+                                                    ..writeAsBytes(imageBytes)).path),
+                                              ],
+                                            )
+                                          : ShareParams(text: '${jaLines[i]}\n\n${enLines[i]}');
+                                      await SharePlus.instance.share(params);
+                                    },
+                                  ),
                                 ],
                               ));
                             } else {
@@ -351,123 +407,12 @@ class _CameraPageState extends State<CameraPage> {
                           return widgets;
                         }(),
                         const SizedBox(height: 20),
-                        // ボタン行
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            TextButton.icon(
-                              icon: const Icon(Icons.copy, size: 16),
-                              label: const Text('テキストをコピー'),
-                              onPressed: () async {
-                                try {
-                                  await Clipboard.setData(
-                                    ClipboardData(
-                                      text: '$japanese\n\n$english',
-                                    ),
-                                  );
-                                  if (context.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('コピーしました'),
-                                        duration: Duration(seconds: 2),
-                                      ),
-                                    );
-                                  }
-                                } catch (_) {
-                                  if (context.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('コピーに失敗しました'),
-                                        duration: Duration(seconds: 2),
-                                      ),
-                                    );
-                                  }
-                                }
-                              },
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                          children: [
-                            TextButton.icon(
-                              icon: const Icon(
-                                Icons.delete_outline,
-                                color: Colors.red,
-                              ),
-                              label: const Text(
-                                '破棄',
-                                style: TextStyle(color: Colors.red),
-                              ),
-                              onPressed: () => Navigator.pop(context),
-                            ),
-                            TextButton.icon(
-                              icon: const Icon(Icons.save_alt),
-                              label: const Text('保存'),
-                              onPressed: imageBytes == null
-                                  ? null
-                                  : () async {
-                                      final result =
-                                          await ImageGallerySaver.saveImage(
-                                            imageBytes,
-                                          );
-                                      if (context.mounted) {
-                                        final success =
-                                            result['isSuccess'] == true;
-                                        showDialog(
-                                          context: context,
-                                          builder: (ctx) => AlertDialog(
-                                            content: Text(
-                                              success
-                                                  ? '保存しました'
-                                                  : '写真へのアクセスが許可されていません。\n\n設定 → Vocasnap → 写真\nから「追加のみ」または「すべての写真」を選択してください。',
-                                              textAlign: TextAlign.center,
-                                            ),
-                                            actionsAlignment:
-                                                MainAxisAlignment.center,
-                                            actions: [
-                                              if (!success)
-                                                TextButton(
-                                                  onPressed: () async {
-                                                    Navigator.pop(ctx);
-                                                    await launchUrl(
-                                                      Uri.parse('app-settings:'),
-                                                    );
-                                                  },
-                                                  child: const Text('設定を開く'),
-                                                ),
-                                              TextButton(
-                                                onPressed: () =>
-                                                    Navigator.pop(ctx),
-                                                child: Text(success ? 'OK' : '閉じる'),
-                                              ),
-                                            ],
-                                          ),
-                                        );
-                                      }
-                                    },
-                            ),
-                            TextButton.icon(
-                              icon: const Icon(Icons.share),
-                              label: const Text('シェア'),
-                              onPressed: imageBytes == null
-                                  ? null
-                                  : () async {
-                                      final dir = await getTemporaryDirectory();
-                                      final file = File(
-                                        '${dir.path}/share_image.jpg',
-                                      );
-                                      await file.writeAsBytes(imageBytes);
-                                      await SharePlus.instance.share(
-                                        ShareParams(
-                                          text: '$japanese\n\n$english',
-                                          files: [XFile(file.path)],
-                                        ),
-                                      );
-                                    },
-                            ),
-                          ],
+                        Center(
+                          child: TextButton.icon(
+                            icon: const Icon(Icons.delete_outline, color: Colors.red),
+                            label: const Text('破棄', style: TextStyle(color: Colors.red)),
+                            onPressed: () => Navigator.pop(context),
+                          ),
                         ),
                       ],
                     ),
