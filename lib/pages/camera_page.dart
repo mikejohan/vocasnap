@@ -448,7 +448,7 @@ class _CameraPageState extends State<CameraPage> {
           },
         );
       },
-    );
+    ).whenComplete(() => _tts.stop());
   }
 
   @override
