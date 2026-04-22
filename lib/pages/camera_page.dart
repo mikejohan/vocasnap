@@ -231,11 +231,11 @@ class _CameraPageState extends State<CameraPage> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) {
-        bool isSpeaking = false;
+        int? speakingIndex;
         return StatefulBuilder(
           builder: (context, setSheetState) {
             _tts.setCompletionHandler(
-              () => setSheetState(() => isSpeaking = false),
+              () => setSheetState(() => speakingIndex = null),
             );
             return SizedBox(
               height: MediaQuery.of(context).size.height * 0.8,
@@ -272,71 +272,58 @@ class _CameraPageState extends State<CameraPage> {
                             ),
                           ),
                         const SizedBox(height: 12),
-                        // 日本語
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            '🇯🇵 日本語',
-                            style: TextStyle(fontSize: 12, color: Colors.grey),
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        SelectableText(
-                          japanese,
-                          style: const TextStyle(
-                            fontSize: 15,
-                            color: Colors.black87,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        const Icon(Icons.swap_horiz, color: Colors.grey),
-                        const SizedBox(height: 12),
-                        // 英語
-                        Row(
-                          children: [
-                            const Text(
-                              '🇺🇸 English',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey,
-                              ),
-                            ),
-                            const Spacer(),
-                            IconButton(
-                              icon: Icon(
-                                isSpeaking
-                                    ? Icons.stop_circle_outlined
-                                    : Icons.volume_up,
-                                size: 32,
-                                color: isSpeaking
-                                    ? Colors.orangeAccent
-                                    : Colors.grey,
-                              ),
-                              onPressed: english.isEmpty
-                                  ? null
-                                  : () async {
-                                      if (isSpeaking) {
-                                        await _tts.stop();
-                                        setSheetState(() => isSpeaking = false);
-                                      } else {
-                                        final prefs = await SharedPreferences.getInstance();
-                                        final rate = prefs.getDouble(kTtsSpeechRateKey) ?? kTtsSpeechRateDefault;
-                                        await _tts.setSpeechRate(rate);
-                                        setSheetState(() => isSpeaking = true);
-                                        await _tts.speak(english);
-                                      }
-                                    },
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        SelectableText(
-                          english,
-                          style: const TextStyle(
-                            fontSize: 15,
-                            color: Colors.black87,
-                          ),
-                        ),
+                        // 文ごとのペア表示（各ペアに読み上げボタン）
+                        ...() {
+                          final jaLines = japanese.split('\n').where((s) => s.trim().isNotEmpty).toList();
+                          final enLines = english.split('\n').where((s) => s.trim().isNotEmpty).toList();
+                          final count = jaLines.length < enLines.length ? jaLines.length : enLines.length;
+                          final widgets = <Widget>[];
+                          for (int i = 0; i < count; i++) {
+                            if (i > 0) widgets.add(const Divider(height: 24));
+                            widgets.add(SelectableText(
+                              jaLines[i],
+                              style: const TextStyle(fontSize: 15, color: Colors.black87),
+                            ));
+                            widgets.add(const SizedBox(height: 8));
+                            widgets.add(const Icon(Icons.swap_horiz, color: Colors.grey));
+                            widgets.add(const SizedBox(height: 8));
+                            widgets.add(Row(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                Expanded(
+                                  child: SelectableText(
+                                    enLines[i],
+                                    style: const TextStyle(fontSize: 15, color: Colors.black87),
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: Icon(
+                                    speakingIndex == i
+                                        ? Icons.stop_circle_outlined
+                                        : Icons.volume_up,
+                                    size: 24,
+                                    color: speakingIndex == i
+                                        ? Colors.orangeAccent
+                                        : Colors.grey,
+                                  ),
+                                  onPressed: () async {
+                                    if (speakingIndex == i) {
+                                      await _tts.stop();
+                                      setSheetState(() => speakingIndex = null);
+                                    } else {
+                                      final prefs = await SharedPreferences.getInstance();
+                                      final rate = prefs.getDouble(kTtsSpeechRateKey) ?? kTtsSpeechRateDefault;
+                                      await _tts.setSpeechRate(rate);
+                                      setSheetState(() => speakingIndex = i);
+                                      await _tts.speak(enLines[i]);
+                                    }
+                                  },
+                                ),
+                              ],
+                            ));
+                          }
+                          return widgets;
+                        }(),
                         const SizedBox(height: 20),
                         // ボタン行
                         Row(
