@@ -281,7 +281,7 @@ class _CameraPageState extends State<CameraPage> {
                           ),
                         ),
                         const SizedBox(height: 4),
-                        Text(
+                        SelectableText(
                           japanese,
                           style: const TextStyle(
                             fontSize: 15,
@@ -330,7 +330,7 @@ class _CameraPageState extends State<CameraPage> {
                           ],
                         ),
                         const SizedBox(height: 4),
-                        Text(
+                        SelectableText(
                           english,
                           style: const TextStyle(
                             fontSize: 15,
