@@ -19,6 +19,7 @@ import 'package:cac/pages/contact_page.dart';
 import 'package:cac/pages/licenses_page.dart';
 import 'package:cac/pages/settings_page.dart';
 import 'package:flutter_tts/flutter_tts.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../constants.dart';
 
@@ -418,16 +419,28 @@ class _CameraPageState extends State<CameraPage> {
                                           context: context,
                                           builder: (ctx) => AlertDialog(
                                             content: Text(
-                                              success ? '保存しました' : '保存に失敗しました',
+                                              success
+                                                  ? '保存しました'
+                                                  : '写真へのアクセスが許可されていません。\n\n設定 → Vocasnap → 写真\nから「追加のみ」または「すべての写真」を選択してください。',
                                               textAlign: TextAlign.center,
                                             ),
                                             actionsAlignment:
                                                 MainAxisAlignment.center,
                                             actions: [
+                                              if (!success)
+                                                TextButton(
+                                                  onPressed: () async {
+                                                    Navigator.pop(ctx);
+                                                    await launchUrl(
+                                                      Uri.parse('app-settings:'),
+                                                    );
+                                                  },
+                                                  child: const Text('設定を開く'),
+                                                ),
                                               TextButton(
                                                 onPressed: () =>
                                                     Navigator.pop(ctx),
-                                                child: const Text('OK'),
+                                                child: Text(success ? 'OK' : '閉じる'),
                                               ),
                                             ],
                                           ),
